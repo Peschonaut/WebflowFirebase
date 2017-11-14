@@ -1,0 +1,101 @@
+<script src="https://www.gstatic.com/firebasejs/4.3.0/firebase.js"></script>
+<script>
+  // Document ready polyfill: https://stackoverflow.com/questions/799981/document-ready-equivalent-without-jquery
+  var ready=function(){function e(){if(!r.isReady){try{document.documentElement.doScroll("left")}catch(t){return void setTimeout(e,1)}r.ready()}}var t,n,o={};o["[object Boolean]"]="boolean",o["[object Number]"]="number",o["[object String]"]="string",o["[object Function]"]="function",o["[object Array]"]="array",o["[object Date]"]="date",o["[object RegExp]"]="regexp",o["[object Object]"]="object";var r={isReady:!1,readyWait:1,holdReady:function(e){e?r.readyWait++:r.ready(!0)},ready:function(e){if(!0===e&&!--r.readyWait||!0!==e&&!r.isReady){if(!document.body)return setTimeout(r.ready,1);if(r.isReady=!0,!0!==e&&--r.readyWait>0)return;t.resolveWith(document,[r])}},bindReady:function(){if(!t){if(t=r._Deferred(),"complete"===document.readyState)return setTimeout(r.ready,1);if(document.addEventListener)document.addEventListener("DOMContentLoaded",n,!1),window.addEventListener("load",r.ready,!1);else if(document.attachEvent){document.attachEvent("onreadystatechange",n),window.attachEvent("onload",r.ready);var o=!1;try{o=null==window.frameElement}catch(e){}document.documentElement.doScroll&&o&&e()}}},_Deferred:function(){var e,t,n,o=[],a={done:function(){if(!n){var t,d,i,c,u,y=arguments;for(e&&(u=e,e=0),t=0,d=y.length;t<d;t++)i=y[t],"array"===(c=r.type(i))?a.done.apply(a,i):"function"===c&&o.push(i);u&&a.resolveWith(u[0],u[1])}return this},resolveWith:function(r,a){if(!n&&!e&&!t){a=a||[],t=1;try{for(;o[0];)o.shift().apply(r,a)}finally{e=[r,a],t=0}}return this},resolve:function(){return a.resolveWith(this,arguments),this},isResolved:function(){return!(!t&&!e)},cancel:function(){return n=1,o=[],this}};return a},type:function(e){return null==e?String(e):o[Object.prototype.toString.call(e)]||"object"}};return document.addEventListener?n=function(){document.removeEventListener("DOMContentLoaded",n,!1),r.ready()}:document.attachEvent&&(n=function(){"complete"===document.readyState&&(document.detachEvent("onreadystatechange",n),r.ready())}),function(e){r.bindReady();r.type(e);t.done(e)}}();
+
+  // JSON pretty print
+  var syntaxHighlight = function (e){return(e=e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")).replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,function(e){var t="number";return/^"/.test(e)?t=/:$/.test(e)?"key":"string":/true|false/.test(e)?t="boolean":/null/.test(e)&&(t="null"),'<span class="'+t+'">'+e+"</span>"})}
+
+  // Initialize Firebase
+  var config = {
+    apiKey: "API_KEY",
+    authDomain: "AUTH_DOMAIN",
+    databaseURL: "DATABASE_URL",
+    projectId: "PROJECT_ID",
+    storageBucket: "STORAGE BUCKET",
+    messagingSenderId: "MESSAGING_SENDER_ID"
+  };
+  firebase.initializeApp(config);
+  protectedRoutes = ['signedin'];
+
+  // authstatelistener
+  firebase.auth().onAuthStateChanged(function(user) {
+    if (user) {
+      // User is signed in.
+      sessionStorage.setItem("Myself", JSON.stringify(user));
+      if (document.location.href == document.location.origin + "/signin") {
+        document.location = document.location.origin + "/signedin"
+      }
+    } else {
+      sessionStorage.setItem("Myself", "{}");
+      if (protectedRoutes.indexOf(document.location.href.split('/')[3]) > -1) {
+        document.location = document.location.origin
+      }
+    }
+  });
+
+  readDocument = function(databaseReference) {
+    /*
+      Returns a promise that can be used like this:
+      readDocument(databaseReference).then(function(snap) { console.log(snap.val()) });
+    */
+    return firebase.database().ref(databaseReference).once('value');
+  };
+
+  insertDocument = function(databaseReference, objectToInsert) {
+    var newChildRef = firebase.database().ref(databaseReference).push();
+    newChildRef.set(objectToInsert);
+  };
+
+  updateDocument = function(databaseReference, objectKeysToUpdate) {
+    firebase.database().ref(databaseReference).update(objectKeysToUpdate);
+  };
+
+  deleteDocument = function(databaseReference) {
+    firebase.database().ref(databaseReference).remove();
+  };
+
+  reactiveDataLinkToElementId = function(databaseReference, elementId, transformation=undefined) {
+    /*
+      reactiveDataLinkToElementId("objects", "objectRendering", function(obj) {
+      	return JSON.stringify(obj, null, 2);
+      });
+    */
+    return reactiveDataLinkToElementSelector(databaseReference, '#'+elementId, transformation);
+  };
+
+  reactiveDataLinkToMustacheTag = function(databaseReference, mustacheTag, transformation=function(obj){return obj;}) {
+    /*
+      reactiveDataLinkToMustacheTag("objects/", "{{allObjects}}", function(obj) {
+      	return JSON.stringify(obj, null, 2);
+      });
+    */
+    firebase.database().ref(databaseReference).on('value', function(snap){
+      sessionStorage.setItem(databaseReference, JSON.stringify(snap));
+      document.body.innerHTML = document.body.innerHTML.replace(new RegExp(mustacheTag,"g"), transformation(snap.val()));
+    });
+  };
+
+  fillMustacheTag = function(fillWith, mustacheTag) {
+    /*
+      fillMustacheTag(myDoc.email, "{{currentUserEmail}}");
+    */
+    ready(function(){
+      document.body.innerHTML = document.body.innerHTML.replace(new RegExp(mustacheTag,"g"), fillWith);
+    });
+  };
+
+  reactiveDataLinkToElementSelector = function(databaseReference, elementSelector, transformation=function(obj){return obj;}) {
+    firebase.database().ref(databaseReference).on('value', function(snap){
+      sessionStorage.setItem(databaseReference, JSON.stringify(snap));
+      document.querySelector(elementSelector).innerHTML = transformation(snap.val()); //JSON.stringify(snap.val(), null, 2);
+    });
+  };
+
+  // Look for logout Buttons
+  ready(function(){
+    document.getElementById('loginButton').addEventListener("click", function() {
+      firebase.auth().signOut()
+    });
+  });
+</script>

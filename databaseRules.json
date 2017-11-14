@@ -1,0 +1,21 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    },
+    "objects": {
+        ".read": true,
+        ".write": false,
+        "$pushId": {
+          ".read": false,
+          ".write": "data.child('uid').val() === auth.uid || (!data.exists() && newData.exists())",
+          "uid": {
+          	".validate": "newData.val() === auth.uid"
+          }
+      	}
+    }
+  }
+}
